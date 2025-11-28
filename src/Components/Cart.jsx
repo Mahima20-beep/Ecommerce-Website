@@ -1,59 +1,51 @@
-import { useContext, useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MdDeleteOutline } from "react-icons/md";
 import { BsFillCartXFill } from "react-icons/bs";
-import { ProductContext } from "../Context/products-context";
+import { useSelector, useDispatch } from "react-redux";
+import {
+  increaseItem,
+  decreaseItem,
+  removeFromCart,
+  clearCart,
+  applyPromo,
+} from "../Redux/Slice/cartSlice";
+
 import Swal from "sweetalert2";
 import toast from "react-hot-toast";
 
 const Cart = () => {
-  const {
-    cartItems,
-    removeFromCart,
-    increaseItems,
-    decreaseItems,
-    taxes,
-    clearCart,
-    getImageSrc,
-  } = useContext(ProductContext);
-
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const { cartItems, promo } = useSelector((state) => state.cart);
+  const cartArray = Object.values(cartItems);
+
   const [toastShown, setToastShown] = useState(false);
-
-  const [promoCode, setPromoCode] = useState(
-    () => localStorage.getItem("promoCode") || ""
-  );
-  const [promoApplied, setPromoApplied] = useState(
-    () => Number(localStorage.getItem("promoApplied")) || 0
-  );
-
-  useEffect(() => {
-    localStorage.setItem("promoCode", promoCode);
-    localStorage.setItem("promoApplied", promoApplied);
-  }, [promoCode, promoApplied]);
+  const taxes = 5.0;
 
   const totalPrice =
     Math.round(
-      Object.values(cartItems).reduce((total, item) => {
-        const price = parseFloat(item?.price) || 0;
-        const qty = parseInt(item?.qty) || 0;
+      cartArray.reduce((total, item) => {
+        const price = parseFloat(item.price) || 0;
+        const qty = parseInt(item.qty) || 0;
         return total + price * qty;
       }, 0) * 100
     ) / 100;
 
   const finalPrice =
-    Math.round((totalPrice + (taxes || 0) - promoApplied) * 100) / 100 || 0;
+    Math.round((totalPrice + taxes - promo.discount) * 100) / 100 || 0;
 
   const handleApplyPromo = () => {
-    if (promoCode === "PRODUCT100" && totalPrice > 1000) {
-      setPromoApplied(100);
-      toast.success("PRODUCT100 Applied! $100 off");
-    } else if (promoCode === "PRODUCT50" && totalPrice > 500) {
-      setPromoApplied(50);
-      toast.success("PRODUCT50 Applied! $50 off");
+    if (promo.code === "PRODUCT100" && totalPrice > 1000) {
+      dispatch(applyPromo({ code: "PRODUCT100", discount: 100 }));
+      toast.success("PRODUCT100 Applied!");
+    } else if (promo.code === "PRODUCT50" && totalPrice > 500) {
+      dispatch(applyPromo({ code: "PRODUCT50", discount: 50 }));
+      toast.success("PRODUCT50 Applied!");
     } else {
-      setPromoApplied(0);
-      toast.error("Invalid promo, subtotal too low");
+      dispatch(applyPromo({ code: "", discount: 0 }));
+      toast.error("Invalid promo or subtotal too low");
     }
   };
 
@@ -68,7 +60,7 @@ const Cart = () => {
       cancelButtonText: "Cancel",
     }).then((result) => {
       if (result.isConfirmed) {
-        removeFromCart(item.id);
+        dispatch(removeFromCart(item.id));
         Swal.fire({
           title: "Removed!",
           text: `${item.title} has been removed from your cart.`,
@@ -89,11 +81,7 @@ const Cart = () => {
       cancelButtonText: "Cancel",
     }).then((result) => {
       if (result.isConfirmed) {
-        clearCart();
-        localStorage.removeItem("promoCode");
-        localStorage.removeItem("promoApplied");
-        setPromoCode("");
-        setPromoApplied(0);
+        dispatch(clearCart());
         Swal.fire({
           title: "Your cart has been cleared!",
           icon: "success",
@@ -117,8 +105,13 @@ const Cart = () => {
     navigate("/Checkout");
   };
 
-  const hasItemsInCart =
-    Object.values(cartItems).filter((item) => item.qty > 0).length > 0;
+  const hasItemsInCart = cartArray.length > 0;
+
+  const getImageSrc = (thumbnail) => {
+    if (!thumbnail) return null;
+    if (thumbnail.startsWith("http")) return thumbnail;
+    return `/images/${thumbnail}`;
+  };
 
   return (
     <div className="min-h-screen lg:max-w-5xl max-lg:max-w-2xl mx-auto bg-white p-4 mt-7">
@@ -131,10 +124,7 @@ const Cart = () => {
             {hasItemsInCart && (
               <button
                 className="text-sm px-4 py-2.5 font-medium bg-transparent text-slate-900 border border-gray-300 rounded-md cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleClear();
-                }}
+                onClick={handleClear}
               >
                 Clear
               </button>
@@ -157,81 +147,79 @@ const Cart = () => {
             </div>
           ) : (
             <div className="space-y-12">
-              {Object.values(cartItems)
-                .filter((item) => item.qty > 0)
-                .map((item) => {
-                  const imageSrc = getImageSrc(item.thumbnail);
-                  return (
-                    <div
-                      key={`${item.id}-${item.title}`}
-                      className="sm:space-y-6 space-y-8"
-                    >
-                      <div className="grid sm:grid-cols-3 items-center gap-4">
-                        <div className="sm:col-span-2 flex sm:items-center max-sm:flex-col gap-6">
-                          <div className="w-24 h-24 shrink-0 bg-white p-2 rounded-md">
-                            {imageSrc ? (
-                              <img
-                                src={imageSrc}
-                                alt={item.title}
-                                className="w-full h-full object-cover rounded-lg"
-                              />
-                            ) : (
-                              <p className="text-gray-400 text-sm">
-                                No image found
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex flex-col justify-between">
-                            <h4 className="text-[15px] font-semibold text-slate-900">
-                              {item.title}
-                            </h4>
-                            <p className="text-sm text-gray-800 font-medium">
-                              Price: ${item.price}
+              {cartArray.map((item) => {
+                const imageSrc = getImageSrc(item.thumbnail);
+                return (
+                  <div
+                    key={`${item.id}-${item.title}`}
+                    className="sm:space-y-6 space-y-8"
+                  >
+                    <div className="grid sm:grid-cols-3 items-center gap-4">
+                      <div className="sm:col-span-2 flex sm:items-center max-sm:flex-col gap-6">
+                        <div className="w-24 h-24 shrink-0 bg-white p-2 rounded-md">
+                          {imageSrc ? (
+                            <img
+                              src={imageSrc}
+                              alt={item.title}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
+                          ) : (
+                            <p className="text-gray-400 text-sm">
+                              No image found
                             </p>
-                            <p className="text-sm text-gray-600">
-                              Qty: {item.qty}
-                            </p>
-                          </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center border border-gray-300 px-5 py-1.5 text-slate-900 text-xs rounded-md">
-                            <span
-                              className="cursor-pointer"
-                              onClick={() => decreaseItems(item.id)}
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="w-3.5 fill-current"
-                                viewBox="0 0 124 124"
-                              >
-                                <path d="M112 50H12C5.4 50 0 55.4 0 62s5.4 12 12 12h100c6.6 0 12-5.4 12-12s-5.4-12-12-12z"></path>
-                              </svg>
-                            </span>
-                            <span className="mx-4">{item.qty}</span>
-                            <span
-                              className="cursor-pointer"
-                              onClick={() => increaseItems(item.id)}
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="w-3.5 fill-current"
-                                viewBox="0 0 42 42"
-                              >
-                                <path d="M37.059 16H26V4.941C26 2.224 23.718 0 21 0s-5 2.224-5 4.941V16H4.941C2.224 16 0 18.282 0 21s2.224 5 4.941 5H16v11.059C16 39.776 18.282 42 21 42s5-2.224 5-4.941V26h11.059C39.776 26 42 23.718 42 21s-2.224-5-4.941-5z"></path>
-                              </svg>
-                            </span>
-                          </div>
-                          <span
-                            className="cursor-pointer text-red-500"
-                            onClick={() => handleRemove(item)}
-                          >
-                            <MdDeleteOutline size={22} />
-                          </span>
+                        <div className="flex flex-col justify-between">
+                          <h4 className="text-[15px] font-semibold text-slate-900">
+                            {item.title}
+                          </h4>
+                          <p className="text-sm text-gray-800 font-medium">
+                            Price: ${item.price}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Qty: {item.qty}
+                          </p>
                         </div>
                       </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center border border-gray-300 px-5 py-1.5 text-slate-900 text-xs rounded-md">
+                          <span
+                            className="cursor-pointer"
+                            onClick={() => dispatch(decreaseItem(item.id))}
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="w-3.5 fill-current"
+                              viewBox="0 0 124 124"
+                            >
+                              <path d="M112 50H12C5.4 50 0 55.4 0 62s5.4 12 12 12h100c6.6 0 12-5.4 12-12s-5.4-12-12-12z"></path>
+                            </svg>
+                          </span>
+                          <span className="mx-4">{item.qty}</span>
+                          <span
+                            className="cursor-pointer"
+                            onClick={() => dispatch(increaseItem(item.id))}
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="w-3.5 fill-current"
+                              viewBox="0 0 42 42"
+                            >
+                              <path d="M37.059 16H26V4.941C26 2.224 23.718 0 21 0s-5 2.224-5 4.941V16H4.941C2.224 16 0 18.282 0 21s2.224 5 4.941 5H16v11.059C16 39.776 18.282 42 21 42s5-2.224 5-4.941V26h11.059C39.776 26 42 23.718 42 21s-2.224-5-4.941-5z"></path>
+                            </svg>
+                          </span>
+                        </div>
+                        <span
+                          className="cursor-pointer text-red-500"
+                          onClick={() => handleRemove(item)}
+                        >
+                          <MdDeleteOutline size={22} />
+                        </span>
+                      </div>
                     </div>
-                  );
-                })}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -252,7 +240,7 @@ const Cart = () => {
               <li className="flex flex-wrap gap-4 text-sm">
                 Discount
                 <span className="ml-auto text-orange-800 font-semibold">
-                  - ${promoApplied}
+                  - ${promo.discount}
                 </span>
               </li>
               <li className="flex flex-wrap gap-4 text-sm">
@@ -261,11 +249,11 @@ const Cart = () => {
                   ${taxes}
                 </span>
               </li>
-              {promoApplied > 0 && (
+              {promo.discount > 0 && (
                 <li className="flex flex-wrap gap-4 text-sm text-orange-800">
                   PROMO
                   <span className="ml-auto text-orange-800 font-semibold">
-                    {promoCode}
+                    {promo.code}
                   </span>
                 </li>
               )}
@@ -302,8 +290,15 @@ const Cart = () => {
                   type="text"
                   placeholder="Promo code"
                   className="w-full outline-0 bg-white text-slate-600 text-sm px-4 py-2.5"
-                  value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  value={promo.code}
+                  onChange={(e) =>
+                    dispatch(
+                      applyPromo({
+                        ...promo,
+                        code: e.target.value.toUpperCase(),
+                      })
+                    )
+                  }
                 />
 
                 <button

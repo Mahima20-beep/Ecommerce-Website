@@ -1,17 +1,24 @@
 import { FaPencilAlt } from "react-icons/fa";
 import { MdDeleteOutline } from "react-icons/md";
 import { FaHeartCircleXmark } from "react-icons/fa6";
-import { useContext } from "react";
-import { WishlistContext } from "../Context/wishlist-context";
-import { ProductContext } from "../Context/products-context";
+import { addToCart } from "../Redux/Slice/cartSlice";
+import { removeFromWishlist } from "../Redux/Slice/wishlistSlice";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import toast from "react-hot-toast";
 
 const Wishlist = () => {
-  const { addToCart, getImageSrc } = useContext(ProductContext);
-  const { wishlist, removeFromWishlist } = useContext(WishlistContext);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const { wishlistItems } = useSelector((state) => state.wishlist);
+
+  const getImageSrc = (thumbnail) => {
+    if (!thumbnail) return null;
+    if (thumbnail.startsWith("http")) return thumbnail;
+    return `/images/${thumbnail}`;
+  };
 
   const handleRemoveWishlist = (item) => {
     Swal.fire({
@@ -24,7 +31,7 @@ const Wishlist = () => {
       cancelButtonText: "Cancel",
     }).then((result) => {
       if (result.isConfirmed) {
-        removeFromWishlist(item.id);
+        dispatch(removeFromWishlist(item.id));
         Swal.fire({
           title: "Removed!",
           text: `${item.title} has been removed from your wishlist.`,
@@ -43,7 +50,7 @@ const Wishlist = () => {
         </h3>
         <hr className="border-gray-300 mb-6" />
 
-        {Object.values(wishlist).length === 0 ? (
+        {Object.values(wishlistItems).length === 0 ? (
           <div className="flex flex-col justify-center items-center text-center py-24">
             <FaHeartCircleXmark className="text-gray-500 h-16 w-16 mb-4" />
             <p className="text-gray-600 font-medium mb-6">
@@ -58,7 +65,7 @@ const Wishlist = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {Object.values(wishlist).map((item) => {
+            {Object.values(wishlistItems).map((item) => {
               const imageSrc = getImageSrc(item.thumbnail);
               return (
                 <div
@@ -84,13 +91,13 @@ const Wishlist = () => {
                     className="mx-auto text-xs px-3 py-2 font-medium w-full bg-blue-600 hover:bg-blue-700 text-white rounded-md transition"
                     onClick={(e) => {
                       e.stopPropagation();
-                      addToCart(item);
+                      dispatch(addToCart(item));
                       toast.success(
                         <span>
                           <b>{item.title}</b> has been Added To Cart!
                         </span>
                       );
-                      removeFromWishlist(item.id);
+                      dispatch(removeFromWishlist(item.id));
                     }}
                   >
                     Add to Cart

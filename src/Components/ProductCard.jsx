@@ -1,22 +1,39 @@
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ProductContext } from "../Context/products-context";
-import { WishlistContext } from "../Context/wishlist-context";
 import toast from "react-hot-toast";
 import { motion } from "motion/react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchProducts } from "../Redux/Slice/productsSlice";
+import {
+  addToCart,
+  decreaseItem,
+  increaseItem,
+  applyPromo,
+} from "../Redux/Slice/cartSlice";
+import { addToWishlist } from "../Redux/Slice/wishlistSlice";
 
 const ProductCard = () => {
-  const {
-    filteredProducts,
-    addToCart,
-    increaseItems,
-    decreaseItems,
-    cartItems,
-  } = useContext(ProductContext);
-  const { addToWishlist } = useContext(WishlistContext);
+  const dispatch = useDispatch();
 
-  const [apiProducts, setApiProducts] = useState([]);
-  const [localProducts, setLocalProducts] = useState([]);
+  const { combinedProducts, isLoading, isError } = useSelector(
+    (state) => state.products
+  );
+
+  const cartItems = useSelector((state) => state.cart.cartItems);
+
+  useEffect(() => {
+    if (combinedProducts.length === 0) {
+      dispatch(fetchProducts());
+    }
+  }, [dispatch, combinedProducts.length]);
+
+  const {
+    selectedBrand,
+    selectedCategory,
+    selectedMinPrice,
+    selectedMaxPrice,
+  } = useSelector((state) => state.filters);
+
   const [keyword, setKeyword] = useState("");
   const [result, setResult] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -24,7 +41,22 @@ const ProductCard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    let temp = [...filteredProducts];
+    let temp = [...combinedProducts];
+
+    if (selectedBrand.length > 0) {
+      temp = temp.filter((item) => selectedBrand.includes(item.brand));
+    }
+
+    if (selectedCategory.length > 0) {
+      temp = temp.filter((item) => selectedCategory.includes(item.category));
+    }
+
+    if (selectedMinPrice || selectedMaxPrice) {
+      temp = temp.filter(
+        (item) =>
+          item.price >= selectedMinPrice && item.price <= selectedMaxPrice
+      );
+    }
 
     if (keyword) {
       const lower = keyword.toLowerCase();
@@ -35,15 +67,16 @@ const ProductCard = () => {
       );
     }
 
-    const apiTemp = temp.filter((item) => item.id && item.id < 200);
-    const localTemp = temp.filter((item) => !item.id || item.id >= 200);
-
-    setApiProducts(apiTemp);
-    setLocalProducts(localTemp);
-
-    setResult([...apiTemp, ...localTemp]);
+    setResult(temp);
     setCurrentPage(1);
-  }, [filteredProducts, keyword]);
+  }, [
+    combinedProducts,
+    keyword,
+    selectedBrand,
+    selectedCategory,
+    selectedMinPrice,
+    selectedMaxPrice,
+  ]);
 
   const handleSearch = (e) => {
     setKeyword(e.target.value);
@@ -90,11 +123,13 @@ const ProductCard = () => {
   const handleCouponClick = (coupon) => {
     const code = coupon.split(" ")[0];
 
-    localStorage.setItem("promoApplied", 1);
-    localStorage.setItem("promoCode", code);
+    dispatch(applyPromo({ code: code, discount: 0 }));
 
     toast.success(`Coupon ${code} applied!`);
   };
+
+  if (isLoading) return <div className="p-5">Loading products...</div>;
+  if (isError) return <div className="p-5 text-red-500">{isError}</div>;
 
   return (
     <div className="flex-1 p-5 ml-1">
@@ -176,7 +211,7 @@ const ProductCard = () => {
                       className="bg-slate-100 w-8 h-8 flex items-center justify-center rounded-full cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
-                        addToWishlist(item);
+                        dispatch(addToWishlist(item));
                         toast.success(
                           <span>
                             <b>{item.title}</b> added to Wishlist!
@@ -204,7 +239,7 @@ const ProductCard = () => {
                         className="border-0 outline-0 cursor-pointer"
                         onClick={(e) => {
                           e.stopPropagation();
-                          decreaseItems(item.id);
+                          dispatch(decreaseItem(item.id));
                         }}
                       >
                         <svg
@@ -225,7 +260,7 @@ const ProductCard = () => {
                         className="border-0 outline-0 cursor-pointer"
                         onClick={(e) => {
                           e.stopPropagation();
-                          increaseItems(item.id);
+                          dispatch(increaseItem(item.id));
                         }}
                       >
                         <svg
@@ -243,7 +278,7 @@ const ProductCard = () => {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        addToCart(item);
+                        dispatch(addToCart(item));
                         toast.success(
                           <span>
                             <b>{item.title}</b> added to Cart!

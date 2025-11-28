@@ -1,14 +1,16 @@
 import { useEffect, useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { ProductContext } from "./Context/products-context";
 import { IoMdArrowDropdown } from "react-icons/io";
 import { toast } from "react-hot-toast";
+import { useDispatch } from "react-redux";
+import { updateCart, applyPromo } from "./Redux/Slice/cartSlice";
 
 const MyOrders = () => {
-  const { getImageSrc, updateCart, shipping, taxes } =
-    useContext(ProductContext);
-
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const shipping = 40;
+  const taxes = 5.0;
 
   const [orders, setOrders] = useState([]);
   const [openIndex, setOpenIndex] = useState(null);
@@ -33,25 +35,13 @@ const MyOrders = () => {
   };
 
   const handleOrderAgain = (items) => {
-    const cart = JSON.parse(localStorage.getItem("CART_ITEMS") || "{}");
-
-    const alreadyExists = items.some((item) => cart[item.id]);
-
-    if (alreadyExists) {
-      toast.error("These items are already in your cart!");
-      return;
-    }
-
+    const newCart = {};
     items.forEach((item) => {
-      if (cart[item.id]) {
-        cart[item.id].qty += item.qty;
-      } else {
-        cart[item.id] = { ...item };
-      }
+      newCart[item.id] = { ...item };
     });
-
-    localStorage.setItem("CART_ITEMS", JSON.stringify(cart));
-    updateCart(cart);
+    dispatch(applyPromo({ code: "", discount: 0 }));
+    dispatch(updateCart(newCart));
+    toast.success("Items added to cart!");
     navigate("/Cart");
   };
 
@@ -85,6 +75,12 @@ const MyOrders = () => {
     const d = new Date(ts);
     d.setDate(d.getDate() + 11);
     return formatDateTime(d);
+  };
+
+  const getImageSrc = (thumbnail) => {
+    if (!thumbnail) return null;
+    if (thumbnail.startsWith("http")) return thumbnail;
+    return `/images/${thumbnail}`;
   };
 
   return (

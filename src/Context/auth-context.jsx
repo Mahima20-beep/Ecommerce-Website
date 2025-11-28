@@ -1,5 +1,8 @@
 import { createContext, useState, useEffect } from "react";
 import supabase from "../supabase";
+import { useDispatch } from "react-redux";
+import { clearCart } from "../Redux/Slice/cartSlice";
+import { clearWishlist } from "../Redux/Slice/wishlistSlice";
 
 export const AuthContext = createContext();
 
@@ -7,9 +10,11 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const dispatch = useDispatch();
+
   useEffect(() => {
     const getUser = async () => {
-      const { data, error } = await supabase.auth.getUser();
+      const { data } = await supabase.auth.getUser();
       if (data?.user) setUser(data.user);
     };
     getUser();
@@ -30,15 +35,15 @@ export const AuthProvider = ({ children }) => {
     const previousEmail = localStorage.getItem("LAST_EMAIL");
 
     if (previousEmail && previousEmail !== currentEmail) {
-      localStorage.removeItem("CART_ITEMS");
-      localStorage.removeItem("WISHLIST_ITEMS");
+      dispatch(clearCart());
+      dispatch(clearWishlist());
       localStorage.removeItem("USER_ADDRESS");
       localStorage.removeItem("ORDERS");
 
-      window.dispatchEvent(new Event("reset_cart"));
-      window.dispatchEvent(new Event("reset_wishlist"));
       window.dispatchEvent(new Event("reset_address"));
       window.dispatchEvent(new Event("reset_orders"));
+
+      setUser(null);
     }
 
     localStorage.setItem("LAST_EMAIL", currentEmail);

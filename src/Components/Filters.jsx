@@ -1,39 +1,50 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect } from "react";
 import { AdminContext } from "../Context/admin-context";
-import { ProductContext } from "../Context/products-context";
 import { CiFilter } from "react-icons/ci";
 import { SiBrandfolder } from "react-icons/si";
 import { TbCategory } from "react-icons/tb";
 import { IoIosPricetags } from "react-icons/io";
 import { IoMdArrowDropdown } from "react-icons/io";
 import { IoMdArrowDropup } from "react-icons/io";
+import { useSelector, useDispatch } from "react-redux";
+import {
+  toggleBrand,
+  toggleCategory,
+  setPriceRange,
+  clearFilters,
+} from "../Redux/Slice/filtersSlice";
 
-const Filters = ({ data }) => {
+const Filters = () => {
   const { categories } = useContext(AdminContext);
 
   const {
     selectedBrand,
-    handleBrandClick,
     selectedCategory,
-    handleCategoryClick,
-    clearFilters,
     selectedMinPrice,
     selectedMaxPrice,
-    handlePriceChange,
-  } = useContext(ProductContext);
+  } = useSelector((state) => state.filters);
+
+  const dispatch = useDispatch();
 
   const [searchBrand, setSearchBrand] = useState("");
   const [brandOpen, setBrandOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
 
-  const prices = data.map((item) => item.price);
+  const data = useSelector((state) => state.products.combinedProducts);
+  const prices = data.length > 0 ? data.map((item) => item.price) : [0];
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
 
-  const trackLeft =
-    ((selectedMinPrice - minPrice) / (maxPrice - minPrice)) * 100;
-  const trackWidth =
-    ((selectedMaxPrice - selectedMinPrice) / (maxPrice - minPrice)) * 100;
+  const safeRange = maxPrice - minPrice || 1;
+
+  const trackLeft = ((selectedMinPrice - minPrice) / safeRange) * 100;
+  const trackWidth = ((selectedMaxPrice - selectedMinPrice) / safeRange) * 100;
+
+  useEffect(() => {
+    if (minPrice && maxPrice) {
+      dispatch(setPriceRange({ min: minPrice, max: maxPrice }));
+    }
+  }, [minPrice, maxPrice, dispatch]);
 
   const uniqueBrands = [
     ...new Set(
@@ -63,7 +74,7 @@ const Filters = ({ data }) => {
           </div>
           <button
             type="button"
-            onClick={clearFilters}
+            onClick={() => dispatch(clearFilters())}
             className="text-sm text-red-500 font-semibold cursor-pointer"
           >
             Clear all
@@ -132,7 +143,7 @@ const Filters = ({ data }) => {
                       id={brand}
                       name="brand"
                       checked={selectedBrand.includes(brand)}
-                      onChange={() => handleBrandClick(brand)}
+                      onChange={() => dispatch(toggleBrand(brand))}
                       className="cursor-pointer"
                     />
                     <label
@@ -179,9 +190,7 @@ const Filters = ({ data }) => {
                       : "bg-gray-100 border-gray-300 text-slate-600 hover:border-gray-900"
                   }`}
                   onClick={() => {
-                    // Merge both API and local categories together
-                    const combinedCategory = category || cat?.slug;
-                    handleCategoryClick(combinedCategory);
+                    dispatch(toggleCategory(category));
                   }}
                 >
                   {category}
@@ -218,7 +227,7 @@ const Filters = ({ data }) => {
                   Number(e.target.value),
                   selectedMaxPrice - 1
                 );
-                handlePriceChange(value, selectedMaxPrice);
+                dispatch(setPriceRange({ min: value, max: selectedMaxPrice }));
               }}
               className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer top-0 z-3 pointer-events-auto
                 [&::-webkit-slider-thumb]:appearance-none
@@ -247,7 +256,7 @@ const Filters = ({ data }) => {
                   Number(e.target.value),
                   selectedMinPrice + 1
                 );
-                handlePriceChange(selectedMinPrice, value);
+                dispatch(setPriceRange({ min: selectedMinPrice, max: value }));
               }}
               className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer top-0 z-4 pointer-events-auto
                 [&::-webkit-slider-thumb]:appearance-none

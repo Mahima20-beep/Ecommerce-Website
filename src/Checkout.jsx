@@ -1,23 +1,25 @@
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MdDeleteOutline } from "react-icons/md";
-import { ProductContext } from "./Context/products-context";
 import { PayPalButtons } from "@paypal/react-paypal-js";
+import { useDispatch, useSelector } from "react-redux";
 import supabase from "./supabase";
 import Swal from "sweetalert2";
 import toast from "react-hot-toast";
+import {
+  increaseItem,
+  decreaseItem,
+  removeFromCart,
+  clearCart,
+  applyPromo,
+} from "./Redux/Slice/cartSlice";
 
 const Checkout = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
   const [selectedPayment, setSelectedPayment] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-
-  const [promoCode, setPromoCode] = useState(
-    localStorage.getItem("promoCode") || ""
-  );
-  const [promoApplied, setPromoApplied] = useState(
-    Number(localStorage.getItem("promoApplied")) || 0
-  );
 
   const [customer, setCustomer] = useState({
     firstName: "",
@@ -29,16 +31,11 @@ const Checkout = () => {
 
   const [errors, setErrors] = useState({});
 
-  const {
-    cartItems,
-    increaseItems,
-    decreaseItems,
-    taxes,
-    shipping,
-    removeFromCart,
-    getImageSrc,
-    clearCart,
-  } = useContext(ProductContext);
+  const { cartItems, promo } = useSelector((state) => state.cart);
+  const cartArray = Object.values(cartItems);
+
+  const taxes = 5.0;
+  const shipping = 40;
 
   useEffect(() => {
     const saved = localStorage.getItem("USER_ADDRESS") || "";
@@ -61,30 +58,39 @@ const Checkout = () => {
 
   const totalPrice =
     Math.round(
-      Object.values(cartItems).reduce((total, item) => {
-        const price = parseFloat(item?.price) || 0;
-        const qty = parseInt(item?.qty) || 0;
+      cartArray.reduce((total, item) => {
+        const price = parseFloat(item.price) || 0;
+        const qty = parseInt(item.qty) || 0;
         return total + price * qty;
       }, 0) * 100
     ) / 100;
 
   const finalPrice =
-    Math.round(
-      (totalPrice + (taxes || 0) + (shipping || 0) - promoApplied) * 100
-    ) / 100 || 0;
+    Math.round((totalPrice + taxes + shipping - promo.discount) * 100) / 100 ||
+    0;
 
   useEffect(() => {
-    if (totalPrice < 500 && promoApplied > 0) {
-      setPromoCode("");
-      setPromoApplied(0);
-      localStorage.removeItem("promoCode");
-      localStorage.removeItem("promoApplied");
+    if (!promo.code) return;
+
+    let validPromo = { code: "", discount: 0 };
+
+    if (promo.code === "PRODUCT100" && totalPrice > 1000) {
+      validPromo = { code: "PRODUCT100", discount: 100 };
+    } else if (promo.code === "PRODUCT50" && totalPrice > 500) {
+      validPromo = { code: "PRODUCT50", discount: 50 };
     }
-  }, [totalPrice, promoApplied]);
+
+    if (
+      validPromo.code !== promo.code ||
+      validPromo.discount !== promo.discount
+    ) {
+      dispatch(applyPromo(validPromo));
+    }
+  }, [totalPrice, promo.code, promo.discount, dispatch]);
 
   const handleRemove = (item) => {
     Swal.fire({
-      title: `Remove ${item.title}?`,
+      title: `Are you sure you want to remove ${item.title}?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#0B6623",
@@ -92,7 +98,7 @@ const Checkout = () => {
       confirmButtonText: "Yes, remove it!",
     }).then((result) => {
       if (result.isConfirmed) {
-        removeFromCart(item.id);
+        dispatch(removeFromCart(item.id));
         Swal.fire("Removed!", `${item.title} removed.`, "success");
       }
     });
@@ -179,7 +185,7 @@ const Checkout = () => {
         const existingOrder = JSON.parse(saved);
         if (existingOrder.checkoutFingerprint === fingerprint) {
           toast.error("This order has already been placed!");
-          navigate("/Orders");
+          navigate("/Checkout");
           setIsProcessing(false);
           return;
         }
@@ -201,7 +207,8 @@ const Checkout = () => {
         price: parseFloat(item.price),
       })),
       subtotal: totalPrice,
-      discount: promoApplied,
+      discount: promo.discount,
+      promoCode: promo.code,
       taxes: taxes || 0,
       shipping: shipping || 0,
       total: finalPrice,
@@ -218,16 +225,16 @@ const Checkout = () => {
     orderIds.unshift(orderId);
     localStorage.setItem("ORDER_IDS", JSON.stringify(orderIds));
 
-    if (clearCart) clearCart();
-    localStorage.removeItem("CART_ITEMS");
-
-    localStorage.removeItem("promoCode");
-    localStorage.removeItem("promoApplied");
-
     toast.success(`Order placed successfully! #${orderId}`);
-    navigate("/Orders");
-    clearCart();
+    navigate("/OrderSummary");
+    dispatch(clearCart());
     setIsProcessing(false);
+  };
+
+  const getImageSrc = (thumbnail) => {
+    if (!thumbnail) return null;
+    if (thumbnail.startsWith("http")) return thumbnail;
+    return `/images/${thumbnail}`;
   };
 
   return (
@@ -273,7 +280,7 @@ const Checkout = () => {
                         <div className="flex items-center border border-gray-300 px-4 py-1.5 rounded-md text-xs">
                           <span
                             className="cursor-pointer"
-                            onClick={() => decreaseItems(item.id)}
+                            onClick={() => dispatch(decreaseItem(item.id))}
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
@@ -286,7 +293,7 @@ const Checkout = () => {
                           <span className="mx-4">{item.qty}</span>
                           <span
                             className="cursor-pointer"
-                            onClick={() => increaseItems(item.id)}
+                            onClick={() => dispatch(increaseItem(item.id))}
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
@@ -315,7 +322,7 @@ const Checkout = () => {
             <li className="flex flex-wrap gap-4 text-sm">
               Discount
               <span className="ml-auto text-orange-800 font-semibold">
-                - ${promoApplied}
+                - ${promo.discount}
               </span>
             </li>
             <li className="flex flex-wrap gap-4 text-sm">
@@ -330,10 +337,10 @@ const Checkout = () => {
                 ${taxes}
               </span>
             </li>
-            {promoApplied > 0 && (
+            {promo.discount > 0 && (
               <li className="flex flex-wrap gap-4 text-sm text-orange-800">
                 PROMO
-                <span className="ml-auto font-semibold">{promoCode}</span>
+                <span className="ml-auto font-semibold">{promo.code}</span>
               </li>
             )}
             <hr className="border-gray-300 mt-4 mb-8" />

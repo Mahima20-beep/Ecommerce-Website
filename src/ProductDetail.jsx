@@ -1,21 +1,22 @@
 import { useContext, useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ProductContext } from "./Context/products-context";
-import { WishlistContext } from "./Context/wishlist-context";
+import { addToWishlist } from "./Redux/Slice/wishlistSlice";
+import { addToCart, increaseItem, decreaseItem } from "./Redux/Slice/cartSlice";
+import { useDispatch, useSelector } from "react-redux";
 import { AuthContext } from "./Context/auth-context";
 import { FaStar, FaStarHalfAlt, FaRegStar } from "react-icons/fa";
 import toast from "react-hot-toast";
 
 const ProductDetail = () => {
-  const { cartItems, addToCart, increaseItems, decreaseItems, getImageSrc } =
-    useContext(ProductContext);
+  const cartItems = useSelector((state) => state.cart.cartItems);
   const { user } = useContext(AuthContext);
-  const { addToWishlist } = useContext(WishlistContext);
 
   const { id } = useParams();
   const [singleProduct, setSingleProduct] = useState(null);
   const [isAdded, setIsAdded] = useState(false);
+
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -56,6 +57,12 @@ const ProductDetail = () => {
     return stars;
   };
 
+  const getImageSrc = (thumbnail) => {
+    if (!thumbnail) return null;
+    if (thumbnail.startsWith("http")) return thumbnail;
+    return `/images/${thumbnail}`;
+  };
+
   const imageSrc = getImageSrc(singleProduct.thumbnail);
 
   return (
@@ -63,7 +70,6 @@ const ProductDetail = () => {
       <div className="p-4 py-16">
         <div className="lg:max-w-3xl max-w-xl mx-auto">
           <div className="grid items-stretch grid-cols-1 lg:grid-cols-2 max-lg:gap-4 max-sm:gap-4">
-            {/* Image Section */}
             <div className="w-full lg:sticky top-0 flex">
               <div className="flex flex-col gap-2 w-full">
                 <div className="bg-white shadow-sm p-0 rounded-xl w-[90%] mx-auto">
@@ -82,7 +88,6 @@ const ProductDetail = () => {
               </div>
             </div>
 
-            {/* Details Section */}
             <div className="w-full flex flex-col">
               <div className="mt-4">
                 <h1 className="text-3xl sm:text-4xl font-bold text-slate-900">
@@ -106,8 +111,11 @@ const ProductDetail = () => {
                     className="bg-slate-300 w-8 h-8 flex items-center justify-center rounded-full cursor-pointer"
                     onClick={() => {
                       user
-                        ? (addToWishlist(singleProduct), navigate("/Wishlist"))
-                        : addToWishlist(singleProduct);
+                        ? dispatch(
+                            addToWishlist(singleProduct),
+                            navigate("/Wishlist")
+                          )
+                        : !dispatch(addToWishlist(singleProduct));
                       toast.success(
                         `${singleProduct.title} has been added to Wishlist!`
                       );
@@ -127,12 +135,11 @@ const ProductDetail = () => {
 
               <hr className="my-6 border-gray-300" />
 
-              {/* Cart Controls */}
               <div className="flex gap-4 items-center mb-2">
                 <div className="flex gap-5 items-center border border-gray-300 bg-white px-4 py-2 w-max rounded-lg">
                   <button
                     type="button"
-                    onClick={() => decreaseItems(singleProduct.id)}
+                    onClick={() => dispatch(decreaseItem(singleProduct.id))}
                     className="border-0 outline-0 cursor-pointer"
                   >
                     <svg
@@ -150,7 +157,7 @@ const ProductDetail = () => {
 
                   <button
                     type="button"
-                    onClick={() => increaseItems(singleProduct.id)}
+                    onClick={() => dispatch(increaseItem(singleProduct.id))}
                     className="border-0 outline-0 cursor-pointer"
                   >
                     <svg
@@ -170,7 +177,7 @@ const ProductDetail = () => {
                   onClick={() => {
                     if (isAdded) return;
                     if (user) {
-                      addToCart(singleProduct.id);
+                      dispatch(addToCart(singleProduct.id));
                       navigate("/Cart");
                       setIsAdded(true);
                     } else {

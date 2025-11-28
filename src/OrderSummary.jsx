@@ -1,8 +1,6 @@
-import { useState, useEffect, useContext } from "react";
-import { ProductContext } from "./Context/products-context";
+import { useState, useEffect } from "react";
 
 const OrderSummary = () => {
-  const { taxes, shipping, getImageSrc } = useContext(ProductContext);
   const [order, setOrder] = useState(null);
 
   useEffect(() => {
@@ -36,7 +34,16 @@ const OrderSummary = () => {
     );
   }
 
-  const { customer, items, subtotal, discount, total, timestamp } = order;
+  const {
+    customer,
+    items,
+    subtotal,
+    discount,
+    total,
+    timestamp,
+    taxes,
+    shipping,
+  } = order;
 
   const formatPhoneNumber = (phone) => {
     if (!phone) return "N/A";
@@ -61,6 +68,12 @@ const OrderSummary = () => {
   };
 
   const timePlaced = formatDateTime(timestamp);
+
+  const getImageSrc = (thumbnail) => {
+    if (!thumbnail) return null;
+    if (thumbnail.startsWith("http")) return thumbnail;
+    return `/images/${thumbnail}`;
+  };
 
   return (
     <div className="bg-white p-4">

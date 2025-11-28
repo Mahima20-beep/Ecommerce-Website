@@ -1,6 +1,5 @@
 import { ProductContextProvider } from "./Context/products-context";
 import { Routes, Route } from "react-router-dom";
-import { WishlistProvider } from "./Context/wishlist-context";
 import { AuthProvider } from "./Context/auth-context";
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 import { AdminContextProvider } from "./Context/admin-context";
@@ -34,26 +33,24 @@ const App = () => {
       <AdminContextProvider>
         <AuthProvider>
           <ProductContextProvider>
-            <WishlistProvider>
-              <Header />
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/Products" element={<Dashboard />} />
-                <Route path="/Cart" element={<Cart />} />
-                <Route path="/:name/:id" element={<ProductDetail />} />
-                <Route path="/Wishlist" element={<Wishlist />} />
-                <Route path="/Register" element={<Register />} />
-                <Route path="/Login" element={<Login />} />
-                <Route path="/Checkout" element={<Checkout />} />
-                <Route path="/Category" element={<Category />} />
-                <Route path="/ProductAdmin" element={<ProductAdmin />} />
-                <Route path="/Profile" element={<Profile />} />
-                <Route path="/Orders" element={<OrderSummary />} />
-                <Route path="/MyOrders" element={<MyOrders />} />
-              </Routes>
-              <Footer />
-              <Toastbox />
-            </WishlistProvider>
+            <Header />
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/Products" element={<Dashboard />} />
+              <Route path="/Cart" element={<Cart />} />
+              <Route path="/:name/:id" element={<ProductDetail />} />
+              <Route path="/Wishlist" element={<Wishlist />} />
+              <Route path="/Register" element={<Register />} />
+              <Route path="/Login" element={<Login />} />
+              <Route path="/Checkout" element={<Checkout />} />
+              <Route path="/Category" element={<Category />} />
+              <Route path="/ProductAdmin" element={<ProductAdmin />} />
+              <Route path="/Profile" element={<Profile />} />
+              <Route path="/OrderSummary" element={<OrderSummary />} />
+              <Route path="/MyOrders" element={<MyOrders />} />
+            </Routes>
+            <Footer />
+            <Toastbox />
           </ProductContextProvider>
         </AuthProvider>
       </AdminContextProvider>
